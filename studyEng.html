@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 英語學習家教</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+        /* 自定義滾動條樣式 */
+        #chat-window::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chat-window::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        #chat-window::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        #chat-window::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* 密碼輸入框顯示為星號 */
+        #apiKey {
+            -webkit-text-security: disc;
+            text-security: disc;
+        }
+        .chat-bubble {
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        }
+        .chat-bubble.new-message {
+            transform: scale(0.95);
+            opacity: 0;
+        }
+        .typing-indicator span {
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 via-purple-100 to-yellow-100 h-screen flex flex-col">
+
+    <div id="app" class="flex flex-col h-full max-w-4xl mx-auto w-full p-4">
+
+        <!-- 頁首 -->
+        <header class="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg mb-4 border border-gray-200">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h1 class="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
+                    AI 英語學習家教
+                </h1>
+                <div class="flex items-center gap-2">
+                    <input type="password" id="apiKey" placeholder="貼上您的 Gemini API Key" class="w-40 text-sm p-2 border rounded-lg focus:ring-2 focus:ring-blue-400 transition">
+                    <button id="downloadChat" class="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow active:scale-95">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 對話視窗 -->
+        <main id="chat-window" class="flex-1 overflow-y-auto p-4 bg-white/50 backdrop-blur-sm rounded-xl shadow-inner border border-gray-200/50 space-y-6">
+            <!-- 初始歡迎訊息 -->
+            <div class="chat-bubble ai-bubble flex items-start gap-3">
+                <div class="bg-blue-500 text-white p-2 rounded-full flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                </div>
+                <div class="bg-white p-4 rounded-lg rounded-tl-none shadow-md max-w-lg text-gray-800 text-lg">
+                    <p class="leading-relaxed">Hello! I'm your AI English tutor. How can I help you with your English studies today? You can ask me about grammar, vocabulary, or practice conversation. Feel free to ask in Chinese or English!</p>
+                    <button class="speak-btn mt-2 text-blue-500 hover:text-blue-700 transition-colors" data-text="Hello! I'm your AI English tutor. How can I help you with your English studies today? You can ask me about grammar, vocabulary, or practice conversation. Feel free to ask in Chinese or English!">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- 輸入區域 -->
+        <footer class="mt-4">
+            <div class="flex items-center bg-white p-3 rounded-xl shadow-lg border border-gray-200">
+                <input type="text" id="message-input" class="w-full text-lg p-2 border-none focus:ring-0 bg-transparent" placeholder="用中文或英文提問...">
+                <button id="send-btn" class="ml-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full hover:opacity-90 transition-opacity shadow-md active:scale-95">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const apiKeyInput = document.getElementById('apiKey');
+        const downloadChatBtn = document.getElementById('downloadChat');
+
+        // 對話歷史紀錄，用於發送給 API
+        let conversationHistory = [];
+
+        // 初始化，設定系統提示
+        const systemPrompt = `You are a friendly and encouraging English tutor AI. Your name is 'Gemini English Tutor'.
+Your role is to help students learn English.
+**Strict Rules:**
+1. You MUST respond ONLY in English, even if the user asks in another language.
+2. Your conversations MUST be strictly limited to English learning topics (grammar, vocabulary, conversation practice, translation for learning purposes, etc.). If the user asks about anything else (like math, history, your own nature), you must politely decline in English, for example: 'I'm sorry, my purpose is to help you with English. Let's focus on that!'
+3. Your responses must be plain text. Do NOT use any Markdown formatting (like *, #, or \`\`\`).
+4. Keep your answers concise and easy to understand for an English learner.`;
+
+        conversationHistory.push({
+            role: "system",
+            parts: [{ text: systemPrompt }]
+        });
+        
+        // 將初始歡迎訊息加入歷史紀錄 (但不顯示)
+        const initialMessage = "Hello! I'm your AI English tutor. How can I help you with your English studies today? You can ask me about grammar, vocabulary, or practice conversation. Feel free to ask in Chinese or English!";
+        conversationHistory.push({ role: "model", parts: [{ text: initialMessage }] });
+
+
+        // 發送訊息事件
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        // 朗讀按鈕事件 (事件委派)
+        chatWindow.addEventListener('click', function(e) {
+            const target = e.target.closest('.speak-btn');
+            if (target) {
+                const textToSpeak = target.dataset.text;
+                speak(textToSpeak);
+            }
+        });
+
+        // 下載對話紀錄
+        downloadChatBtn.addEventListener('click', downloadChat);
+
+        function addMessageToUI(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-bubble', 'new-message');
+
+            let bubbleContent = '';
+            if (sender === 'user') {
+                messageDiv.classList.add('user-bubble', 'flex', 'justify-end');
+                bubbleContent = `
+                    <div class="bg-green-400 p-4 rounded-lg rounded-br-none shadow-md max-w-lg text-gray-900 text-lg">
+                        <p class="leading-relaxed">${message}</p>
+                    </div>
+                    <div class="bg-green-500 text-white p-2 rounded-full flex-shrink-0 ml-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                `;
+            } else { // AI
+                messageDiv.classList.add('ai-bubble', 'flex', 'items-start', 'gap-3');
+                const sanitizedMessage = escapeHtml(message);
+                bubbleContent = `
+                    <div class="bg-blue-500 text-white p-2 rounded-full flex-shrink-0">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg rounded-tl-none shadow-md max-w-lg text-gray-800 text-lg">
+                        <p class="leading-relaxed">${message}</p>
+                        <button class="speak-btn mt-2 text-blue-500 hover:text-blue-700 transition-colors" data-text="${sanitizedMessage}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                        </button>
+                    </div>
+                `;
+            }
+            messageDiv.innerHTML = bubbleContent;
+            chatWindow.appendChild(messageDiv);
+
+            // 觸發動畫
+            requestAnimationFrame(() => {
+                messageDiv.classList.remove('new-message');
+                messageDiv.style.transform = 'scale(1)';
+                messageDiv.style.opacity = '1';
+            });
+
+            // 自動滾動到底部
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typing-indicator';
+            typingDiv.classList.add('chat-bubble', 'ai-bubble', 'flex', 'items-start', 'gap-3');
+            typingDiv.innerHTML = `
+                <div class="bg-blue-500 text-white p-2 rounded-full flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                </div>
+                <div class="bg-white p-4 rounded-lg rounded-tl-none shadow-md">
+                    <div class="typing-indicator">
+                        <span class="inline-block w-2 h-2 bg-gray-400 rounded-full"></span>
+                        <span class="inline-block w-2 h-2 bg-gray-400 rounded-full"></span>
+                        <span class="inline-block w-2 h-2 bg-gray-400 rounded-full"></span>
+                    </div>
+                </div>
+            `;
+            chatWindow.appendChild(typingDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        async function sendMessage() {
+            const userMessage = messageInput.value.trim();
+            if (!userMessage) return;
+
+            addMessageToUI('user', userMessage);
+            messageInput.value = '';
+            showTypingIndicator();
+
+            // 將用戶訊息加入歷史紀錄
+            conversationHistory.push({ role: "user", parts: [{ text: userMessage }] });
+
+            // 準備發送給 API 的資料 (不包含 system prompt)
+            const payloadContents = conversationHistory.filter(msg => msg.role !== 'system');
+            // 將 system prompt 放在 generateContent 的 systemInstruction 欄位
+            const payload = {
+                contents: payloadContents,
+                systemInstruction: {
+                    role: "system",
+                    parts: [{ text: systemPrompt }]
+                }
+            };
+            
+            // 如果 API Key 輸入框有值，就使用它
+            let apiKey = apiKeyInput.value.trim();
+            // 如果沒有輸入，則保留為空字串，讓環境提供臨時金鑰
+            if (!apiKey) {
+                apiKey = ""; 
+            }
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error.message || `HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                removeTypingIndicator();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const aiMessage = result.candidates[0].content.parts[0].text;
+                    addMessageToUI('ai', aiMessage);
+                    // 將 AI 回應加入歷史紀錄
+                    conversationHistory.push({ role: "model", parts: [{ text: aiMessage }] });
+                } else {
+                    // 處理 API 回應為空或格式不符的情況
+                    addMessageToUI('ai', "I'm sorry, I couldn't generate a response. Please try again.");
+                }
+
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                removeTypingIndicator();
+                let errorMessage = "Sorry, something went wrong. Please check your API key or network connection and try again.";
+                if (error.message.includes("API key not valid")) {
+                    errorMessage = "The API key you provided is not valid. Please check it and try again. If you don't have one, you can use the temporary key by leaving the field blank.";
+                }
+                addMessageToUI('ai', errorMessage);
+            }
+        }
+
+        function speak(text) {
+            // 停止任何正在播放的語音
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            // 尋找可用的英文語音
+            const voices = window.speechSynthesis.getVoices();
+            utterance.voice = voices.find(voice => voice.lang.startsWith('en-US')) || voices.find(voice => voice.lang.startsWith('en-'));
+            utterance.lang = 'en-US';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // 瀏覽器可能需要一點時間來加載語音列表
+        window.speechSynthesis.onvoiceschanged = () => {
+            // 可以在此處預加載語音
+        };
+
+        function downloadChat() {
+            let chatContent = "AI English Tutor Chat Log\n";
+            chatContent += "============================\n\n";
+
+            // 過濾掉系統提示
+            const chatHistory = conversationHistory.filter(msg => msg.role !== 'system');
+
+            chatHistory.forEach(msg => {
+                const prefix = msg.role === 'user' ? 'You' : 'AI Tutor';
+                chatContent += `${prefix}: ${msg.parts[0].text}\n\n`;
+            });
+
+            const blob = new Blob([chatContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'chat_history.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+    </script>
+</body>
+</html>
